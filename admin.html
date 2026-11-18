@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>管理后台 · 一键行万里</title>
+<style>
+:root {
+    --primary: #0f766e; --primary-deep: #115e59;
+    --accent: #e07b39;
+    --bg: #f6f8f6; --card: #ffffff; --text: #1f2937;
+    --muted: #5c6b6a; --border: #e6eae6; --radius: 14px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.card {
+    width: 100%; max-width: 420px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 6px 22px rgba(15, 80, 72, .12);
+    padding: 30px 28px;
+}
+.brand { text-align: center; margin-bottom: 6px; }
+.brand h1 { font-size: 20px; letter-spacing: 3px; }
+.brand h1 .hl { color: var(--accent); }
+.brand p { margin-top: 6px; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+.badge {
+    display: inline-block; margin-top: 10px; padding: 3px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+}
+.badge.ok  { background: #e7f4ef; color: #0f766e; }
+.badge.bad { background: #fdeeea; color: #b3541e; }
+.form { margin-top: 22px; }
+label { display: block; font-size: 13px; font-weight: 600; color: #374241; margin-bottom: 6px; }
+input[type=password], input[type=text] {
+    width: 100%; padding: 11px 14px; font-size: 14px;
+    border: 1.5px solid var(--border); border-radius: 10px; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+}
+input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15, 118, 110, .12); }
+.btn {
+    width: 100%; margin-top: 18px; padding: 12px;
+    border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+    color: #fff; background: linear-gradient(135deg, #0f9488 0%, #0f766e 100%);
+    cursor: pointer; transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.msg { margin-top: 14px; font-size: 13px; line-height: 1.6; min-height: 1em; }
+.msg.ok  { color: #0f766e; }
+.msg.err { color: #c0392b; }
+.hint { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--muted); line-height: 1.7; }
+.switch { margin-top: 16px; text-align: center; font-size: 13px; }
+.switch a { color: var(--primary); cursor: pointer; text-decoration: underline; }
+.hidden { display: none; }
+code { background: #eef3f1; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="brand">
+        <h1>⚙️ 管理<span class="hl">后台</span></h1>
+        <p>一键行万里 · 服务配置</p>
+        <span class="badge bad" id="keyBadge">检测中…</span>
+    </div>
+
+    <!-- 首次设置密码 -->
+    <div class="form hidden" id="setupForm">
+        <label>设置管理员密码（首次使用）</label>
+        <input type="password" id="setupPwd1" placeholder="至少 6 位" autocomplete="new-password">
+        <label style="margin-top:12px">再输入一次确认</label>
+        <input type="password" id="setupPwd2" placeholder="再次输入" autocomplete="new-password">
+        <button class="btn" id="setupBtn">创建管理员并进入</button>
+    </div>
+
+    <!-- 登录 -->
+    <div class="form hidden" id="loginForm">
+        <label>管理员密码</label>
+        <input type="password" id="loginPwd" placeholder="输入密码" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="btn" id="loginBtn">登 录</button>
+    </div>
+
+    <!-- Key 管理（登录后） -->
+    <div class="form hidden" id="keyForm">
+        <label>DeepSeek API Key</label>
+        <input type="text" id="keyInput" placeholder="sk-..." autocomplete="off">
+        <div class="msg" id="keyMsg"></div>
+        <button class="btn" id="saveBtn">保存 Key</button>
+        <p class="hint">
+            · Key 只保存在服务器 <code>data/deepseek_key.json</code>，不会下发给任何用户<br>
+            · 保存后立即生效，用户端无需任何操作<br>
+            · 更换 Key 时直接粘贴新 Key 覆盖即可<br>
+            · 请勿将 <code>data/</code> 目录提交到 Git
+        </p>
+        <div class="switch"><a id="logoutLink">退出登录</a></div>
+    </div>
+
+    <div class="msg" id="msg"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let token = sessionStorage.getItem('yjxl_admin_token') || '';
+
+function show(pane) { ['setupForm','loginForm','keyForm'].forEach(f => $(f).classList.add('hidden')); if (pane) $(pane).classList.remove('hidden'); }
+function setMsg(text, cls) { const m = $('msg'); m.textContent = text || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
+function setBadge(configured, masked) {
+    const b = $('keyBadge');
+    if (configured) { b.textContent = '✅ Key 已配置 ' + masked; b.className = 'badge ok'; }
+    else { b.textContent = '⚠️ 尚未配置 Key'; b.className = 'badge bad'; }
+}
+
+async function api(path, opts) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error(data.message || ('请求失败(' + res.status + ')'));
+    return data;
+}
+
+async function bootstrap() {
+    try {
+        // 1) 服务是否已设置管理员密码
+        let needSetup = false;
+        try { await api('/api/admin/login', { method: 'POST', body: '{}' }); }
+        catch (e) { needSetup = e.message.includes('尚未设置'); }
+        if (token) {
+            try {
+                const st = await api('/api/admin/status', { headers: { 'Authorization': 'Bearer ' + token } });
+                setBadge(st.configured, st.keyMasked);
+                show('keyForm');
+                if (!st.configured) setMsg('首次使用：粘贴你的 DeepSeek API Key 并保存。', 'ok');
+                return;
+            } catch (e) { token = ''; sessionStorage.removeItem('yjxl_admin_token'); }
+        }
+        show(needSetup ? 'setupForm' : 'loginForm');
+        $('keyBadge').textContent = needSetup ? '⚠️ 尚未配置 Key' : '🔒 登录后查看';
+        $('keyBadge').className = 'badge ' + (needSetup ? 'bad' : 'ok');
+    } catch (e) {
+        setBadge(false);
+        setMsg('无法连接服务：' + e.message + '（请确认 server.js 已启动）', 'err');
+    }
+}
+
+$('setupBtn').onclick = async () => {
+    const p1 = $('setupPwd1').value, p2 = $('setupPwd2').value;
+    if (p1.length < 6) return setMsg('密码至少 6 位', 'err');
+    if (p1 !== p2) return setMsg('两次输入的密码不一致', 'err');
+    $('setupBtn').disabled = true;
+    try {
+        const r = await api('/api/admin/setup', { method: 'POST', body: JSON.stringify({ password: p1 }) });
+        token = r.token; sessionStorage.setItem('yjxl_admin_token', token);
+        setBadge(false); show('keyForm'); setMsg('管理员创建成功，请录入 DeepSeek Key。', 'ok');
+    } catch (e) { setMsg(e.message, 'err'); }
+    $('setupBtn').disabled = false;
+};
+
+async function doLogin() {
+    const pwd = $('loginPwd').value;
+    $('loginBtn').disabled = true;
+    try {
+        const r = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: pwd }) });
+        token = r.token; sessionStorage.setItem('yjxl_admin_token', token);
+        const st = await api('/api/admin/status', { headers: { 'Authorization': 'Bearer ' + token } });
+        setBadge(st.configured, st.keyMasked);
+        show('keyForm'); setMsg('');
+        $('loginPwd').value = '';
+    } catch (e) { setMsg(e.message, 'err'); }
+    $('loginBtn').disabled = false;
+}
+$('loginBtn').onclick = doLogin;
+
+$('saveBtn').onclick = async () => {
+    const key = $('keyInput').value.trim();
+    if (!key) return setMsg('请粘贴 Key', 'err');
+    $('saveBtn').disabled = true; $('keyMsg').textContent = '';
+    try {
+        const r = await api('/api/admin/key', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ key }) });
+        setBadge(true, r.keyMasked);
+        $('keyMsg').innerHTML = '<span style="color:#0f766e">✅ 已保存，前台立即生效（显示 ' + r.keyMasked + '）</span>';
+        $('keyInput').value = '';
+    } catch (e) { $('keyMsg').innerHTML = '<span style="color:#c0392b">' + e.message + '</span>'; if (e.message.includes('登录已过期')) show('loginForm'); }
+    $('saveBtn').disabled = false;
+};
+
+$('logoutLink').onclick = () => { token = ''; sessionStorage.removeItem('yjxl_admin_token'); show('loginForm'); setBadge(false); };
+
+bootstrap();
+</script>
+</body>
+</html>

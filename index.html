@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一键行万里 · 中国大陆旅行轨迹生成器</title>
+<!-- 腾讯地图代理配置（WorkBuddy 预览环境免 Key） -->
+<script type="text/javascript">
+    window._TMapSecurityConfig = {
+        serviceHost: 'http://127.0.0.1:__WB_HTTP_PORT__/_TMapService/_wbt/__WB_TMAP_SECRET__',
+    };
+</script>
+<script src="https://map.qq.com/api/gljs?v=1.exp&libraries=service"></script>
+<style>
+:root {
+    --primary: #0f766e;        /* 墨绿 · 远山 */
+    --primary-deep: #115e59;
+    --accent: #e07b39;         /* 陶土橙 · 日落 */
+    --accent-soft: #fdf3ec;
+    --bg: #f6f7f4;
+    --card: #ffffff;
+    --text: #243032;
+    --muted: #5c6b6a;
+    --border: #e6eae6;
+    --radius: 16px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 2px 10px rgba(20, 60, 55, .08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* 休闲旅行背景：柔和色晕 + 低透明度旅行元素纹理（航线/定位标/圆点） */
+    background:
+        radial-gradient(1100px 480px at 88% -6%, rgba(224, 123, 57, .07), transparent 62%),
+        radial-gradient(950px 460px at -8% 34%, rgba(15, 118, 110, .08), transparent 60%),
+        #f6f7f4 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%230f766e' stroke-width='2' opacity='0.06'%3E%3Cpath d='M10 60 Q 70 22 130 60 T 250 60' stroke-dasharray='6 8' stroke-linecap='round'/%3E%3Cpath d='M-10 190 Q 60 152 130 190 T 270 190' stroke-dasharray='6 8' stroke-linecap='round'/%3E%3C/g%3E%3Cg opacity='0.10'%3E%3Cpath fill='%23e07b39' d='M190 84c-9.4 0-17 7.6-17 17 0 12.8 17 28 17 28s17-15.2 17-28c0-9.4-7.6-17-17-17z'/%3E%3Ccircle cx='190' cy='101' r='6' fill='%23ffffff'/%3E%3C/g%3E%3Cg opacity='0.08'%3E%3Ccircle cx='60' cy='130' r='4' fill='%230f766e'/%3E%3Ccircle cx='150' cy='242' r='3.5' fill='%23e07b39'/%3E%3Ccircle cx='236' cy='160' r='3' fill='%230f766e'/%3E%3C/g%3E%3C/svg%3E") repeat;
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+}
+/* 键盘焦点环（无障碍） */
+:focus-visible { outline: 3px solid rgba(15, 118, 110, .55); outline-offset: 2px; }
+/* 尊重减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+/* 内容容器统一宽度：812 - 两侧16px内边距 = 780，与输入卡同宽 */
+.wrap { max-width: 812px; margin: 0 auto; padding: 0 16px 44px; }
+
+/* ============ 页头卡片（真实风景背景 C · 海滩日落） ============ */
+.page-head {
+    position: relative;
+    max-width: 780px; margin: 22px auto 0;
+    padding: 26px 24px 40px;
+    text-align: center;
+    background-color: #cfdcd8;
+    background-image: url("bg/bg-150752.jpg");
+    background-repeat: no-repeat;
+    background-position: center 58%;
+    background-size: cover;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 6px 22px rgba(15, 80, 72, .14), inset 0 0 0 1px rgba(255, 255, 255, .16);
+    overflow: hidden;
+}
+/* 暗色遮罩：保证白字在明亮照片上的对比度（WCAG AA） */
+.page-head::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10, 26, 24, .32) 0%, rgba(10, 26, 24, .48) 100%);
+}
+.page-head h1 {
+    position: relative; z-index: 1;
+    margin: 8px 0 0; padding-left: 5px; /* 补偿末字字距，保证视觉居中 */
+    font-size: 38px; letter-spacing: 10px; font-weight: 900;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #fff;
+    text-shadow: 0 3px 18px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .35);
+    line-height: 1.15;
+}
+.page-head h1 .hl {
+    background: linear-gradient(170deg, #fffaf0 8%, #ffe0b0 42%, #f7bb78 78%, #eda65f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 3px 12px rgba(0, 0, 0, .5)) drop-shadow(0 0 18px rgba(255, 200, 130, .35));
+}
+.page-head .eyebrow {
+    position: relative; z-index: 1;
+    margin: 0; font-size: 11px; font-weight: 600;
+    letter-spacing: 7px; padding-left: 7px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .72);
+}
+.page-head .head-line {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; margin: 10px auto 0; width: 230px;
+}
+.page-head .head-line i {
+    flex: 1; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 168, .95));
+    box-shadow: 0 0 10px rgba(255, 215, 168, .45);
+}
+.page-head .head-line i:last-child {
+    background: linear-gradient(90deg, rgba(255, 215, 168, .95), transparent);
+}
+.page-head .head-line span {
+    font-size: 11px; color: #ffd7a8;
+    text-shadow: 0 0 12px rgba(255, 215, 168, .9);
+}
+.page-head .tagline {
+    position: relative; z-index: 1;
+    margin-top: 10px; font-size: 13px; letter-spacing: 3px; padding-left: 3px;
+    color: rgba(255, 255, 255, .92);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, .45);
+}
+
+/* ============ 输入卡片 ============ */
+.input-card {
+    margin: 18px auto 0;
+    max-width: 780px;    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(15, 80, 72, .10);
+    padding: 22px;
+    animation: rise .5s ease both;
+}
+@keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.input-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field > label { font-size: 12.5px; color: var(--muted); letter-spacing: .5px; }
+.field input[type=text] {
+    width: 230px; padding: 11px 14px;
+    border: 1.5px solid var(--border); border-radius: 12px;
+    font-size: 15px; outline: none; background: #fafbfa;
+    transition: border-color .2s, box-shadow .2s;
+}
+.field input[type=text]:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, .12);
+    background: #fff;
+}
+.field input[type=text].invalid { border-color: #c0392b; }
+.field input[type=text].invalid:focus { box-shadow: 0 0 0 3px rgba(192, 57, 43, .12); }
+.city-error {
+    display: none; margin-top: 6px; font-size: 12.5px; line-height: 1.5;
+    color: #c0392b; animation: fadeUp .25s ease both;
+}
+.city-error.show { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.city-error .chip-box { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.city-chip {
+    border: 1px solid var(--primary); background: #fff; color: var(--primary-deep);
+    border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer;
+    font-family: inherit; transition: all .15s; line-height: 1.6;
+}
+.city-chip:hover { background: var(--primary); color: #fff; }
+.city-chip:focus-visible { outline: 3px solid rgba(15, 118, 110, .35); outline-offset: 1px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper button {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1.5px solid var(--border); background: #fff;
+    font-size: 17px; cursor: pointer; color: var(--primary);
+    transition: all .15s; line-height: 1;
+}
+.stepper button:hover:not(:disabled) {
+    border-color: var(--primary); background: var(--primary); color: #fff;
+}
+.stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.stepper .val {
+    min-width: 52px; text-align: center; font-size: 17px; font-weight: 700;
+    color: var(--primary);
+}
+.actions { display: flex; gap: 10px; margin-left: auto; }
+.btn {
+    padding: 11px 24px; border-radius: 12px; border: none;
+    font-size: 15px; cursor: pointer; font-weight: 600;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(15, 118, 110, .35);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 0 6px 18px rgba(15, 118, 110, .45); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+.btn-accent {
+    background: var(--accent-soft); color: var(--accent);
+    border: 1.5px solid #f2c9a8;
+}
+.btn-accent:hover { background: #fbe8d8; }
+/* ============ 状态提示 ============ */
+.status {
+    display: none; margin-top: 14px; padding: 12px 16px;
+    border-radius: 12px; font-size: 14px; line-height: 1.6;
+    animation: fadeUp .3s ease both;
+}
+.status.loading {
+    display: flex; align-items: center; gap: 10px;
+    background: #eef6f4; color: var(--primary-deep);
+}
+.status.error { display: block; background: #fdf0ee; color: #b23c2a; }
+.status .spinner {
+    width: 16px; height: 16px; flex-shrink: 0;
+    border: 2px solid rgba(15,118,110,.25); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ 结果区 ============ */
+#result { display: none; margin-top: 26px; }
+.result-inner { animation: fadeUp .4s ease both; }
+.overview { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.overview .chip {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 16px; font-size: 13px;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 5px;
+}
+.overview .chip b { color: var(--accent); font-size: 14px; }
+.plan-title { font-size: 22px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.plan-title::after {
+    content: ''; width: 34px; height: 4px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), #f9c389);
+}
+.plan-sub { color: var(--muted); font-size: 13.5px; margin-bottom: 18px; }
+
+/* 每日区块 */
+.day-block { margin-bottom: 18px; }
+/* Day 标题条：白底 + 彩色左边条（保证文字对比度达标）
+   左轴对齐：天数圆点与景点序号圆点同位（17px），标题文字与景点标题同位（50px） */
+.day-head {
+    display: flex; align-items: center; gap: 9px;
+    padding: 12px 16px 12px 11px; border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--day-color, var(--primary));
+    color: #243032; font-weight: 700; font-size: 15px;
+    letter-spacing: .5px;
+    box-shadow: var(--shadow);
+}
+.day-head .day-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    color: #fff; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.day-head .day-title { color: var(--day-deep, var(--primary-deep)); }
+.day-head .km {
+    margin-left: auto; font-weight: 600; font-size: 12px;
+    color: var(--day-deep, var(--primary-deep));
+    background: var(--day-tint, #eef6f4);
+    padding: 4px 12px; border-radius: 999px;
+}
+.spot {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 16px 16px 14px; margin-top: 10px;
+    box-shadow: var(--shadow);
+    transition: transform .15s, box-shadow .15s;
+}
+.spot:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(20,60,55,.12); }
+.spot-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.spot-head .idx {
+    width: 24px; height: 24px; border-radius: 50%;
+    color: #fff; font-size: 12.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.spot-head h3 { font-size: 16px; }
+.spot-head .meta { margin-left: auto; font-size: 12px; color: var(--muted); }
+/* 正文统一悬挂缩进到标题文字轴线（序号圆点24px + 间距9px = 33px） */
+.tags { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; margin-left: 33px; }
+.tag {
+    font-size: 12px; padding: 3px 11px; border-radius: 999px;
+    background: #eef6f4; color: var(--primary-deep);
+}
+.spot .intro { font-size: 14px; line-height: 1.75; margin-top: 9px; margin-left: 33px; color: #3c4a48; }
+.spot .tips {
+    font-size: 13px; margin-top: 10px; margin-left: 33px; padding: 9px 12px;
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    border-radius: 8px; color: #9a5a28; line-height: 1.65;
+}
+
+/* 地图 */
+.map-card {
+    margin-top: 6px; padding: 0; overflow: hidden;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    box-shadow: var(--shadow); background: var(--card);
+}
+.map-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 18px; font-size: 14px; font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+.map-bar .dot-legend { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.map-bar .dot-legend span {
+    font-size: 11px; color: var(--muted);
+    display: flex; align-items: center; gap: 4px; font-weight: 500;
+}
+.map-bar .dot-legend i {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+#map { width: 100%; height: 400px; }
+
+.result-actions { display: flex; gap: 10px; margin: 18px 0 6px; }
+.footer-note {
+    text-align: center; color: var(--muted); font-size: 12px;
+    margin-top: 24px; line-height: 1.8;
+}
+
+/* 空状态 */
+.empty-state {
+    margin-top: 26px; padding: 44px 20px; text-align: center;
+    border: 1.5px dashed #cbd5d1; border-radius: var(--radius);
+    background: repeating-linear-gradient(-45deg, #fff, #fff 12px, #fafbfa 12px, #fafbfa 24px);
+    color: var(--muted);
+}
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state .empty-title { font-size: 16px; font-weight: 600; color: #3c4a48; margin-bottom: 6px; }
+.empty-state .empty-sub { font-size: 13px; }
+
+/* 骨架屏（加载中） */
+.skeleton-block {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 16px; margin-top: 10px;
+}
+.skeleton-line {
+    height: 14px; border-radius: 7px;
+    background: linear-gradient(90deg, #eef1ef 25%, #e2e8e5 50%, #eef1ef 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s linear infinite;
+}
+.skeleton-line + .skeleton-line { margin-top: 10px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 640px) {
+    .page-head { padding: 18px 20px 26px; }
+    .page-head h1 { font-size: 26px; letter-spacing: 7px; padding-left: 3.5px; }
+    .page-head .head-line { width: 160px; margin-top: 8px; }
+    .page-head .eyebrow { letter-spacing: 5px; padding-left: 5px; }
+    .page-head .tagline { margin-top: 8px; font-size: 11.5px; letter-spacing: 1.5px; padding-left: 1.5px; }
+    .actions { margin-left: 0; width: 100%; }
+    .actions .btn { flex: 1; }
+    .field input[type=text] { width: 100%; }
+    .stepper button { width: 44px; height: 44px; }
+    /* 景点 meta 独立成行，避免窄屏挤压错位 */
+    .spot-head .meta { margin-left: 33px; width: calc(100% - 33px); }
+    #map { height: 320px; }
+}
+</style>
+</head>
+<body>
+<!-- 页头 -->
+<div class="page-head">
+    <p class="eyebrow">China Travel Planner</p>
+    <h1>一键<span class="hl">行万里</span></h1>
+    <div class="head-line"><i></i><span>◆</span><i></i></div>
+    <p class="tagline">输入目的地和天数 · 一键生成行程 · 地图轨迹 · 里程统计</p>
+</div>
+
+<div class="wrap">
+    <!-- 输入卡片 -->
+    <div class="input-card">
+        <div class="input-row">
+            <div class="field">
+                <label>📍 目的地（中国大陆城市）</label>
+                <input type="text" id="cityInput" placeholder="例如：西安、成都、大理……" value="西安"
+                       list="cityList" autocomplete="off" spellcheck="false">
+                <datalist id="cityList"></datalist>
+            </div>
+            <div class="field">
+                <label>📅 旅行天数</label>
+                <div class="stepper">
+                    <button id="dayMinus">−</button>
+                    <span class="val" id="dayVal">3 天</span>
+                    <button id="dayPlus">＋</button>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" id="genBtn">✨ 生成旅行计划</button>
+            </div>
+        </div>
+        <div class="city-error" id="cityError" role="alert"></div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <!-- 空状态 -->
+    <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🗺️</div>
+        <p class="empty-title">你的旅行轨迹将出现在这里</p>
+        <p class="empty-sub">输入目的地和天数，点击「✨ 生成旅行计划」</p>
+    </div>
+
+    <!-- 结果区 -->
+    <div id="result">
+        <div class="result-inner">
+            <div class="overview" id="overview"></div>
+            <h2 class="plan-title" id="planTitle"></h2>
+            <p class="plan-sub" id="planSub"></p>
+            <div id="days"></div>
+            <div class="result-actions">
+                <button class="btn btn-accent" id="regenBtn">🔀 换一套方案</button>
+                <button class="btn btn-accent" id="copyBtn">📋 复制文字版行程</button>
+            </div>
+            <div class="map-card">
+                <div class="map-bar">🛣️ 行程轨迹地图 <span class="dot-legend" id="legend"></span></div>
+                <div id="map"></div>
+            </div>
+            <p class="footer-note">
+                行程由 AI 生成，景点信息可能有误差，出行前请以官方渠道为准。<br>
+                景点间驾车里程由腾讯地图路线规划计算，仅供参考 · 地图数据服务：腾讯地图
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ============ 配置 ============ */
+const DAY_COLORS = ['#e2584c', '#e88f3c', '#c2a53a', '#5aa469', '#3f8fa3', '#5b7fbe', '#8a6fbf'];
+/* 深色一档（700号）：用于白底文字/图标，保证 WCAG AA 对比度 */
+const DAY_COLORS_DEEP = ['#b03a30', '#a35d14', '#7a6a12', '#2f6f45', '#256274', '#34568c', '#5c4890'];
+/* 系统提示词与 DeepSeek Key 均在服务端 server.js，前端只调 /api/generate */
+
+/* ============ 状态 ============ */
+let days = 3;
+let map = null;
+let markerLayers = [];
+let polylineLayers = [];
+let labelLayers = [];
+let currentPlan = null;
+
+/* ============ 工具 ============ */
+const $ = id => document.getElementById(id);
+function setStatus(type, text) {
+    const el = $('status');
+    if (type === 'loading') {
+        el.className = 'status loading';
+        el.innerHTML = '<span class="spinner"></span><span>' + text + '</span>';
+    } else {
+        el.className = 'status ' + type;
+        el.textContent = text;
+    }
+}
+function clearStatus() { $('status').className = 'status'; }
+
+/* ============ 天数步进器 ============ */
+$('dayMinus').onclick = () => { if (days > 1) { days--; updateDays(); } };
+$('dayPlus').onclick = () => { if (days < 7) { days++; updateDays(); } };
+function updateDays() {
+    $('dayVal').textContent = days + ' 天';
+    $('dayMinus').disabled = days <= 1;
+    $('dayPlus').disabled = days >= 7;
+}
+updateDays();
+
+/* ============ AI 生成行程（走服务端 /api/generate，Key 存于服务器） ============ */
+async function generatePlan(city, nDays) {
+    const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city, days: nDays })
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error(data.message || '生成服务异常(' + res.status + ')');
+    const plan = data;
+    if (!plan.itinerary || !Array.isArray(plan.itinerary) || !plan.itinerary.length) {
+        throw new Error('返回数据格式不完整，请重试');
+    }
+    return plan;
+}
+
+/* ============ 渲染行程 ============ */
+function renderPlan(plan) {
+    currentPlan = plan;
+    $('result').style.display = 'block';
+    $('emptyState').style.display = 'none';
+    $('planTitle').textContent = '🎯 ' + plan.destination + ' ' + (plan.days || plan.itinerary.length) + '日游';
+    $('planSub').textContent = plan.transportAdvice || '';
+    $('planSub').style.display = plan.transportAdvice ? '' : 'none';
+
+    // 图例
+    $('legend').innerHTML = plan.itinerary.map(d => {
+        const c = DAY_COLORS[(d.day - 1) % DAY_COLORS.length];
+        return `<span><i style="background:${c}"></i>Day ${d.day}</span>`;
+    }).join('');
+
+    // 每日区块
+    const daysEl = $('days');
+    daysEl.innerHTML = '';
+    plan.itinerary.forEach((d, i) => {
+        const color = DAY_COLORS[(d.day - 1) % DAY_COLORS.length];
+        const deep = DAY_COLORS_DEEP[(d.day - 1) % DAY_COLORS_DEEP.length];
+        const block = document.createElement('div');
+        block.className = 'day-block';
+        block.style.animation = `fadeUp .35s ease ${i * 0.08}s both`;
+        block.innerHTML = `
+            <div class="day-head" style="--day-color:${color}; --day-deep:${deep}; --day-tint:${deep}1a">
+                <span class="day-num" style="background:${deep}">${d.day}</span>
+                <span class="day-title">Day ${d.day} · ${d.title || ''}</span>
+                <span class="km" id="km-day-${d.day}">里程计算中…</span>
+            </div>`;
+        (d.spots || []).forEach((s, j) => {
+            const spot = document.createElement('div');
+            spot.className = 'spot';
+            spot.innerHTML = `
+                <div class="spot-head">
+                    <span class="idx" style="background:${deep}">${j + 1}</span>
+                    <h3>${s.name}</h3>
+                    <span class="meta">${s.period || ''} · 🕐 ${s.duration || ''}</span>
+                </div>
+                <div class="tags">${(s.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                <p class="intro">📖 ${s.intro || ''}</p>
+                ${s.tips ? `<p class="tips">⚠️ ${s.tips}</p>` : ''}`;
+            block.appendChild(spot);
+        });
+        daysEl.appendChild(block);
+    });
+    renderOverview(plan, null);
+    window.scrollTo({ top: $('result').offsetTop - 120, behavior: 'smooth' });
+}
+
+function renderOverview(plan, totalKm) {
+    const nSpots = plan.itinerary.reduce((a, d) => a + (d.spots || []).length, 0);
+    $('overview').innerHTML = `
+        <span class="chip">🗺️ 途经 <b>${nSpots}</b> 个景点</span>
+        <span class="chip">🛣️ 总里程 <b id="totalKmVal">${totalKm == null ? '计算中…' : '约 ' + totalKm + ' 公里'}</b></span>
+        <span class="chip">📅 <b>${plan.itinerary.length}</b> 天行程</span>`;
+}
+
+/* 总里程 count-up 动画（呼应"行万里"主题；尊重减弱动效偏好） */
+function animateTotalKm(target) {
+    const el = $('totalKmVal');
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        el.textContent = '约 ' + target + ' 公里'; return;
+    }
+    const dur = 900, t0 = performance.now();
+    function step(t) {
+        const p = Math.min((t - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = '约 ' + (target * eased).toFixed(1) + ' 公里';
+        if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+/* ============ 地图 ============ */
+function ensureMap() {
+    if (!map) {
+        map = new TMap.Map('map', { zoom: 11, center: new TMap.LatLng(34.2610, 108.9423) });
+    }
+    markerLayers.forEach(l => l.setMap(null));
+    polylineLayers.forEach(l => l.setMap(null));
+    labelLayers.forEach(l => l.setMap(null));
+    markerLayers = []; polylineLayers = []; labelLayers = [];
+}
+
+function drawRoutes(plan) {
+    ensureMap();
+    const allPts = [];
+    plan.itinerary.forEach(d => {
+        const color = DAY_COLORS[(d.day - 1) % DAY_COLORS.length];
+        const pts = (d.spots || []).map(s => new TMap.LatLng(s.lat, s.lng));
+        if (!pts.length) return;
+        allPts.push(...pts);
+        // 景点连线（当日轨迹）
+        if (pts.length >= 2) {
+            const pl = new TMap.MultiPolyline({
+                map,
+                styles: { route: new TMap.PolylineStyle({ color, width: 5, lineCap: 'round' }) },
+                geometries: [{ id: 'd' + d.day, styleId: 'route', paths: pts }]
+            });
+            polylineLayers.push(pl);
+        }
+        // 标记点
+        const mk = new TMap.MultiMarker({
+            map,
+            styles: { dot: new TMap.MarkerStyle({ width: 22, height: 30, anchor: { x: 11, y: 30 } }) },
+            geometries: pts.map((p, i) => ({ id: `d${d.day}-${i}`, styleId: 'dot', position: p }))
+        });
+        markerLayers.push(mk);
+        // 文字标签
+        const lb = new TMap.MultiLabel({
+            map,
+            styles: { name: new TMap.LabelStyle({
+                color: color, size: 12, offset: { x: 0, y: -22 },
+                alignment: 'center', angle: 0, collisionByGeometry: true
+            })},
+            geometries: (d.spots || []).map((s, i) => ({
+                id: `lb${d.day}-${i}`, styleId: 'name',
+                position: pts[i], content: `D${d.day}·${s.name}`
+            }))
+        });
+        labelLayers.push(lb);
+    });
+    // 视野自适应
+    if (allPts.length) {
+        const lats = allPts.map(p => p.lat), lngs = allPts.map(p => p.lng);
+        const pad = 0.05;
+        map.fitBounds(new TMap.LatLngBounds(
+            new TMap.LatLng(Math.min(...lats) - pad, Math.min(...lngs) - pad),
+            new TMap.LatLng(Math.max(...lats) + pad, Math.max(...lngs) + pad)
+        ), { padding: { top: 40, bottom: 40, left: 40, right: 40 } });
+    }
+}
+
+/* ============ 里程计算（腾讯地图驾车路线） ============ */
+function haversine(a, b) {
+    const R = 6371, toR = x => x * Math.PI / 180;
+    const dLat = toR(b.lat - a.lat), dLng = toR(b.lng - a.lng);
+    const h = Math.sin(dLat/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+async function computeMileage(plan) {
+    let totalKm = 0, ok = true;
+    for (const d of plan.itinerary) {
+        const pts = (d.spots || []).map(s => ({ lat: s.lat, lng: s.lng }));
+        let dayKm = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const from = new TMap.LatLng(pts[i].lat, pts[i].lng);
+            const to = new TMap.LatLng(pts[i+1].lat, pts[i+1].lng);
+            try {
+                const driving = new TMap.service.Driving({ policy: 'LEAST_TIME' });
+                const result = await driving.search({ from, to });
+                const route = result.routes && result.routes[0];
+                if (route && route.distance) {
+                    dayKm += route.distance / 1000;   // 单位：米 → 公里
+                } else { ok = false; dayKm += haversine(pts[i], pts[i+1]) * 1.3; }
+            } catch (e) {
+                ok = false;
+                dayKm += haversine(pts[i], pts[i+1]) * 1.3;  // 兜底：直线×1.3
+            }
+        }
+        totalKm += dayKm;
+        const kmEl = $('km-day-' + d.day);
+        if (kmEl) kmEl.textContent = `🛣️ 约 ${dayKm.toFixed(1)} 公里${ok ? '' : '*'}`;
+    }
+    renderOverview(plan, null);
+    animateTotalKm(parseFloat(totalKm.toFixed(1)));
+    if (!ok) {
+        const chip = $('overview');
+        chip.insertAdjacentHTML('beforeend',
+            `<span class="chip">* 部分里程为直线估算</span>`);
+    }
+}
+
+/* ============ 复制文字行程 ============ */
+function buildText(plan) {
+    const lines = [`📍${plan.destination} ${plan.itinerary.length}日游`];
+    if (plan.transportAdvice) lines.push('🚇 ' + plan.transportAdvice);
+    plan.itinerary.forEach(d => {
+        lines.push('', `—— Day ${d.day} · ${d.title || ''} ——`);
+        (d.spots || []).forEach((s, i) => {
+            lines.push(`${i + 1}. ${s.name}（${s.period || ''}，${s.duration || ''}）`);
+            lines.push(`   特点：${(s.tags || []).join(' / ')}`);
+            lines.push(`   介绍：${s.intro || ''}`);
+            if (s.tips) lines.push(`   注意：${s.tips}`);
+        });
+    });
+    lines.push('', '—— 由「一键行万里」生成 ——');
+    return lines.join('\n');
+}
+
+/* ============ 骨架屏（生成中占位） ============ */
+function showSkeleton() {
+    $('emptyState').style.display = 'none';
+    $('result').style.display = 'block';
+    $('planTitle').textContent = '🎯 规划中…';
+    $('planSub').textContent = '';
+    $('planSub').style.display = 'none';
+    $('legend').innerHTML = '';
+    $('overview').innerHTML = '<span class="chip">🛣️ 总里程 <b>计算中…</b></span>';
+    $('days').innerHTML = Array.from({ length: Math.max(days, 1) }).map(() => `
+        <div class="day-block">
+            <div class="skeleton-line" style="height:44px; border-radius:12px;"></div>
+            <div class="skeleton-block">
+                <div class="skeleton-line" style="width:40%"></div>
+                <div class="skeleton-line" style="width:90%"></div>
+                <div class="skeleton-line" style="width:75%"></div>
+            </div>
+        </div>`).join('');
+    window.scrollTo({ top: $('result').offsetTop - 120, behavior: 'smooth' });
+}
+
+/* ============ 城市校验 ============ */
+/* 内置城市名录（与 cities.json 同步；即使没有后端接口也能校验，静态预览同样生效） */
+const CITY_FALLBACK = ['北京','天津','上海','重庆','石家庄','唐山','秦皇岛','邯郸','邢台','保定','张家口','承德','沧州','廊坊','衡水','太原','大同','阳泉','长治','晋城','朔州','晋中','运城','忻州','临汾','吕梁','呼和浩特','包头','乌海','赤峰','通辽','鄂尔多斯','呼伦贝尔','巴彦淖尔','乌兰察布','兴安盟','锡林郭勒','阿拉善','满洲里','二连浩特','沈阳','大连','鞍山','抚顺','本溪','丹东','锦州','营口','阜新','辽阳','盘锦','铁岭','朝阳','葫芦岛','长春','吉林','四平','辽源','通化','白山','松原','白城','延边','集安','哈尔滨','齐齐哈尔','鸡西','鹤岗','双鸭山','大庆','伊春','佳木斯','七台河','牡丹江','黑河','绥化','大兴安岭','漠河','南京','无锡','徐州','常州','苏州','南通','连云港','淮安','盐城','扬州','镇江','泰州','宿迁','杭州','宁波','温州','嘉兴','湖州','绍兴','金华','衢州','舟山','台州','丽水','合肥','芜湖','蚌埠','淮南','马鞍山','淮北','铜陵','安庆','黄山','滁州','阜阳','宿州','六安','亳州','池州','宣城','福州','厦门','莆田','三明','泉州','漳州','南平','龙岩','宁德','武夷山','南昌','景德镇','萍乡','九江','新余','鹰潭','赣州','吉安','宜春','抚州','上饶','井冈山','庐山','婺源','济南','青岛','淄博','枣庄','东营','烟台','潍坊','济宁','泰安','威海','日照','临沂','德州','聊城','滨州','菏泽','曲阜','郑州','开封','洛阳','平顶山','安阳','鹤壁','新乡','焦作','濮阳','许昌','漯河','三门峡','南阳','商丘','信阳','周口','驻马店','济源','武汉','黄石','十堰','宜昌','襄阳','鄂州','荆门','孝感','荆州','黄冈','咸宁','随州','恩施','仙桃','潜江','天门','神农架','长沙','株洲','湘潭','衡阳','邵阳','岳阳','常德','张家界','益阳','郴州','永州','怀化','娄底','湘西','凤凰','广州','韶关','深圳','珠海','汕头','佛山','江门','湛江','茂名','肇庆','惠州','梅州','汕尾','河源','阳江','清远','东莞','中山','潮州','揭阳','云浮','南宁','柳州','桂林','梧州','北海','防城港','钦州','贵港','玉林','百色','贺州','河池','来宾','崇左','涠洲岛','海口','三亚','三沙','儋州','博鳌','成都','自贡','攀枝花','泸州','德阳','绵阳','广元','遂宁','内江','乐山','南充','眉山','宜宾','广安','达州','雅安','巴中','资阳','阿坝','甘孜','凉山','都江堰','峨眉山','九寨沟','康定','稻城','西昌','泸沽湖','贵阳','六盘水','遵义','安顺','毕节','铜仁','黔西南','黔东南','黔南','荔波','赤水','镇远','昆明','曲靖','玉溪','保山','昭通','丽江','普洱','临沧','楚雄','红河','文山','西双版纳','大理','德宏','怒江','迪庆','香格里拉','腾冲','瑞丽','拉萨','日喀则','昌都','林芝','山南','那曲','阿里','西安','铜川','宝鸡','咸阳','渭南','延安','汉中','榆林','安康','商洛','兰州','嘉峪关','金昌','白银','天水','武威','张掖','平凉','酒泉','庆阳','定西','陇南','临夏','甘南','敦煌','西宁','海东','海北','黄南','玉树','果洛','海西','银川','石嘴山','吴忠','固原','中卫','乌鲁木齐','克拉玛依','吐鲁番','哈密','昌吉','博尔塔拉','巴音郭楞','阿克苏','克孜勒苏','喀什','和田','伊犁','塔城','阿勒泰','石河子','布尔津','阿尔山','珲春'];
+const NOT_MAINLAND_HINTS = ['香港','澳门','台湾','台北','新北','台中','台南','高雄','基隆','新竹','嘉义','花莲','垦丁'];
+/* 省级行政区 → 推荐城市（用户输入省份时不直接报错，而是引导选具体城市） */
+const PROVINCE_MAP = {
+    '河北': ['石家庄','承德','秦皇岛','保定'],
+    '山西': ['太原','大同','晋中','忻州'],
+    '辽宁': ['沈阳','大连','丹东'],
+    '吉林': ['长春','集安','延边'],
+    '黑龙江': ['哈尔滨','漠河','牡丹江'],
+    '江苏': ['南京','苏州','扬州','无锡'],
+    '浙江': ['杭州','宁波','绍兴','舟山'],
+    '安徽': ['黄山','合肥','宣城'],
+    '福建': ['厦门','福州','泉州','武夷山'],
+    '江西': ['南昌','景德镇','婺源','庐山'],
+    '山东': ['青岛','济南','泰安','曲阜'],
+    '河南': ['洛阳','郑州','开封'],
+    '湖北': ['武汉','宜昌','恩施','神农架'],
+    '湖南': ['长沙','张家界','凤凰'],
+    '广东': ['广州','深圳','珠海','潮州'],
+    '海南': ['三亚','海口','博鳌'],
+    '四川': ['成都','九寨沟','峨眉山','稻城'],
+    '贵州': ['贵阳','荔波','镇远','赤水'],
+    '云南': ['昆明','大理','丽江','香格里拉'],
+    '陕西': ['西安','延安','汉中'],
+    '甘肃': ['兰州','敦煌','张掖'],
+    '青海': ['西宁','海北','海西'],
+    '宁夏': ['银川','中卫'],
+    '新疆': ['乌鲁木齐','喀什','伊犁','吐鲁番'],
+    '内蒙古': ['呼和浩特','呼伦贝尔','鄂尔多斯','阿尔山'],
+    '广西': ['桂林','南宁','北海','涠洲岛'],
+    '西藏': ['拉萨','林芝','日喀则','阿里']
+};
+/* 省份别名归一：内蒙→内蒙古，去掉「省/自治区/维吾尔自治区」等后缀 */
+function normalizeProvince(raw) {
+    let s = String(raw || '').trim().replace(/\s+/g, '');
+    s = s.replace(/(壮族自治区|回族自治区|维吾尔自治区|自治区|省)$/, '');
+    if (s === '内蒙') s = '内蒙古';
+    return s;
+}
+/* 允许跟在城市名后的合法后缀（其余一律视为错字/街道名） */
+const CITY_SUFFIX_OK = ['市','区','县','地区','盟','自治州','自治县','古城','古镇','古城景区','景区','风景区','旅游区','度假区','新区'];
+let CITY_SET = new Set(CITY_FALLBACK);
+
+/* 归一化：去掉「自治州」及其前的民族名，再去掉「市/地区/盟/县」等后缀 */
+function normalizeCity(raw) {
+    let s = String(raw || '').trim().replace(/\s+/g, '');
+    if (/自治州$/.test(s)) s = s.replace(/自治州$/, '').replace(/([^\s]{1,5}族)+$/, '');
+    return s.replace(/(市|地区|盟|自治县|县)$/, '');
+}
+
+function checkCity(raw) {
+    const input = String(raw || '').trim();
+    if (!input) return { valid: false, message: '请输入目的地城市' };
+    if (input.length > 20) return { valid: false, message: '目的地名称过长，请输入城市名（如：西安）' };
+    for (const t of NOT_MAINLAND_HINTS) {
+        if (input.includes(t)) return { valid: false, message: '暂仅支持中国大陆目的地，请输入大陆城市名' };
+    }
+    // ① 原名或归一化后精确命中
+    if (CITY_SET.has(input) || CITY_SET.has(normalizeCity(input))) return { valid: true };
+    // ② 城市名 + 合法后缀（如「丽江古城」「西双版纳傣族自治州」），错字不会被放过
+    for (const city of CITY_SET) {
+        if (city.length >= 2 && input.startsWith(city)) {
+            const rest = input.slice(city.length);
+            if (CITY_SUFFIX_OK.includes(rest)) return { valid: true };
+            if (/自治(州|县)$/.test(rest)) return { valid: true };
+        }
+    }
+    const prov = checkProvince(input);
+    if (prov) return prov;
+    return { valid: false, message: '请输入正确的城市名（如：西安、成都、大理）' };
+}
+/* 省级行政区识别：给出该省热门城市建议（只保留确实在城市名录里的，避免建议了还被拦） */
+function checkProvince(raw) {
+    const p = normalizeProvince(raw);
+    const cities = PROVINCE_MAP[p];
+    if (!cities) return null;
+    const usable = cities.filter(c => CITY_SET.has(c));
+    return {
+        valid: false,
+        province: true,
+        suggestions: usable,
+        message: `「${p}」是省级行政区，请选择具体城市`
+    };
+}
+function showCityError(msg, suggestions) {
+    const el = $('cityError'), inp = $('cityInput');
+    if (msg) {
+        el.innerHTML = '';
+        const txt = document.createElement('span');
+        txt.textContent = msg;
+        el.appendChild(txt);
+        if (suggestions && suggestions.length) {
+            const box = document.createElement('span');
+            box.className = 'chip-box';
+            suggestions.forEach(name => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'city-chip';
+                b.textContent = name;
+                b.onclick = () => {
+                    inp.value = name;
+                    showCityError('');
+                    inp.focus();
+                    $('genBtn').focus();
+                };
+                box.appendChild(b);
+            });
+            el.appendChild(box);
+        }
+        el.classList.add('show');
+        inp.classList.add('invalid');
+    } else {
+        el.innerHTML = ''; el.classList.remove('show');
+        inp.classList.remove('invalid');
+    }
+}
+/* 先用内置名录渲染补全候选，随后尝试从服务端拉取最新名录（服务端更新城市后无需改页面） */
+function fillCityDatalist(list) {
+    $('cityList').innerHTML = list.map(c => `<option value="${c}">`).join('');
+}
+async function loadCities() {
+    fillCityDatalist([...CITY_SET]);
+    try {
+        const res = await fetch('/api/cities');
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = Array.isArray(data.cities) ? data.cities : [];
+        if (!list.length) return;
+        CITY_SET = new Set(list);
+        fillCityDatalist(list);
+    } catch (e) { /* 无后端（静态预览）时用内置名录，校验照常生效 */ }
+}
+
+/* ============ 事件绑定 ============ */
+async function doGenerate() {
+    const city = $('cityInput').value.trim();
+    const chk = checkCity(city);
+    if (!chk.valid) { showCityError(chk.message, chk.suggestions); $('cityInput').focus(); return; }
+    showCityError('');
+    $('genBtn').disabled = true;
+    setStatus('loading', `正在为你规划「${city}」${days}天行程…（约需10秒）`);
+    showSkeleton();
+    try {
+        const plan = await generatePlan(city, days);
+        clearStatus();
+        renderPlan(plan);
+        drawRoutes(plan);
+        computeMileage(plan);
+    } catch (e) {
+        if (e.name === 'TypeError') {
+            setStatus('error', '无法连接生成服务：请确认后端已启动（node server.js），或稍后再试。');
+        } else {
+            setStatus('error', e.message || '生成失败，请重试。');
+        }
+        // 失败回退：首次使用回到空状态，已有结果则保留原行程
+        if (!currentPlan) {
+            $('result').style.display = 'none';
+            $('emptyState').style.display = '';
+        }
+    } finally {
+        $('genBtn').disabled = false;
+    }
+}
+
+$('genBtn').onclick = () => doGenerate();
+$('regenBtn').onclick = () => doGenerate();
+$('copyBtn').onclick = async () => {
+    if (!currentPlan) return;
+    try {
+        await navigator.clipboard.writeText(buildText(currentPlan));
+        $('copyBtn').textContent = '✅ 已复制';
+        setTimeout(() => $('copyBtn').textContent = '📋 复制文字版行程', 1500);
+    } catch (e) {
+        setStatus('error', '复制失败，请手动选择文本复制。');
+    }
+};
+$('cityInput').addEventListener('keydown', e => { if (e.key === 'Enter') doGenerate(); });
+// 失焦校验、输入时即时清除错误
+$('cityInput').addEventListener('blur', () => {
+    const v = $('cityInput').value.trim();
+    if (!v) return;                          // 空值不在失焦时打扰，提交时才提示
+    const chk = checkCity(v);
+    showCityError(chk.valid ? '' : chk.message, chk.suggestions);
+});
+$('cityInput').addEventListener('input', () => showCityError(''));
+loadCities();
+</script>
+</body>
+</html>

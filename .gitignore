@@ -1,0 +1,15 @@
+# 服务端敏感数据（管理员密码哈希 / DeepSeek Key），绝不入库
+data/
+
+# 临时与调试产物
+*.png
+*.yaml
+.playwright-cli/
+node_modules/
+
+# 部署脚本与工作台数据（含服务器 IP，不入公开仓库）
+deploy/
+.workbuddy/
+
+# 内部调试工具（依赖已删除的测试图）
+bg-picker.html
