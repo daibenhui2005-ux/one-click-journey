@@ -1,0 +1,2 @@
+# 前端页面为展示层，项目主体语言是 JavaScript（Node.js 后端）
+*.html linguist-detectable=false
