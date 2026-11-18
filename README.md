@@ -9,6 +9,32 @@
 
 ---
 
+## English
+
+**One-Click Journey** is a minimalist AI travel planner for mainland China. Enter a destination and the number of days — DeepSeek generates a multi-day itinerary (with spot highlights, descriptions and tips), and the journey is drawn as a trajectory on Tencent Maps with real driving mileage for each day.
+
+### Features
+
+- 🤖 **AI itinerary** — DeepSeek generates a day-by-day plan: spots, intro, tips
+- 🗺️ **Map trajectory** — spots connected on a Tencent Map, day by day
+- 🛣️ **Real mileage** — driving distance between spots via Tencent Map routing (auto fallback to great-circle × 1.3)
+- 🔑 **Key stays server-side** — your DeepSeek API key is configured once in the admin panel and never reaches the browser
+- 🧩 **Zero dependencies** — backend is a single Node.js file (`server.js`), no `npm install`
+
+### Quick start
+
+```bash
+git clone https://github.com/daibenhui2005-ux/one-click-journey.git
+cd one-click-journey
+node server.js          # http://localhost:8787
+```
+
+Open `http://localhost:8787/admin.html`, set the admin password, paste your DeepSeek API key — done. See the Chinese sections below for full deployment (systemd + Nginx) details.
+
+> This project targets **mainland China travel** and uses Tencent Map services, so it is documented in Chinese.
+
+---
+
 ## 一、文件结构
 
 ```
