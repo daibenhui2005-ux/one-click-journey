@@ -1,5 +1,7 @@
 # 一键行万里 · 中国大陆旅行轨迹生成器
 
+> **One-Click Journey** — generate your China travel plan & map trajectory with one click.
+
 输入目的地 + 天数 → AI 生成多日行程 → 腾讯地图轨迹 + 真实里程。
 
 **架构**：前端（index.html）+ 后端（server.js，零依赖）+ 管理后台（admin.html）
